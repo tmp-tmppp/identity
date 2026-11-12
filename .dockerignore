@@ -1,0 +1,3 @@
+*
+!realm/
+!docker-entrypoint.sh

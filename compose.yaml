@@ -1,0 +1,83 @@
+# Local identity provider: Keycloak (built from the Dockerfile) and its own PostgreSQL 18.
+#   docker compose up -d --build
+# The realm "chance" is at http://localhost:8081/realms/chance (the issuer the tenants service expects locally),
+# the admin console at http://localhost:8081/admin, health at http://localhost:9001/health/ready, and the mails
+# Keycloak sends (e-mail verification) at http://localhost:8025 (Mailpit).
+# All passwords and secrets below are local development values only; real ones live in the Secret identity-env.
+name: chance-identity
+
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak-local # hooks:allow local development only
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak-local # hooks:allow local development only
+      KC_HOSTNAME: http://localhost:8081
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin-local-only # hooks:allow local development only
+      CHANCE_WEB_URL: http://localhost:5173
+      TENANTS_CLIENT_SECRET: tenants-local-secret # hooks:allow local development only
+      PAYMENTS_CLIENT_SECRET: payments-local-secret # hooks:allow local development only
+      MARKET_MAKER_CLIENT_SECRET: market-maker-local-secret # hooks:allow local development only
+      MARKETS_CLIENT_SECRET: markets-local-secret # hooks:allow local development only
+      TENANTS_MARKETS_CLIENT_SECRET: tenants-markets-local-secret # hooks:allow local development only
+      PLATFORM_ADMIN_USERNAME: platform-admin
+      PLATFORM_ADMIN_PASSWORD: platform-admin-local # hooks:allow local development only
+      # Imported as verified (no mail is sent to check it); a local address only.
+      PLATFORM_ADMIN_EMAIL: platform-admin@chance.localhost # hooks:allow local development only
+      # Verification mails go to the local mail catcher below: plain SMTP inside the compose network, no TLS and no
+      # login (with SMTP_AUTH=false Keycloak sends none; the two values below only satisfy the entrypoint).
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_FROM: no-reply@chance.localhost
+      SMTP_SSL: "false"
+      SMTP_STARTTLS: "false"
+      SMTP_AUTH: "false"
+      SMTP_USER: mailpit-local # hooks:allow local development only
+      SMTP_PASSWORD: mailpit-local-unused # hooks:allow local development only
+      # The login with Google: placeholders, not a real OAuth client, so the "Google" button on the login page fails
+      # at Google until a real client exists (identity/README.md, "Google login"); every local account works as before.
+      GOOGLE_CLIENT_ID: chance-local-placeholder.apps.googleusercontent.com # hooks:allow local development only
+      GOOGLE_CLIENT_SECRET: google-local-placeholder-not-a-secret # hooks:allow local development only
+      JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=70
+    # The same hardening as in the cluster: read-only file system, writable temporary folders only.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /opt/keycloak/data/tmp
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:9001:9000"
+
+  # Local mail catcher: keeps every mail Keycloak sends (the verification mails of sign-up) and shows them at
+  # http://localhost:8025, so nothing leaves the machine. SMTP on its default port 1025, reachable only inside the
+  # compose network; the mails sit in Mailpit's temporary database inside the container and are gone with it.
+  mailpit:
+    image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    mem_limit: 128m
+    ports:
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  postgres-data:

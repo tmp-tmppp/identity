@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Values of the identity chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "image",
+    "replicaCount",
+    "service",
+    "existingSecret",
+    "env",
+    "resources",
+    "probes",
+    "networkPolicy",
+    "smokeTest"
+  ],
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^(sha256:[0-9a-f]{64})?$"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      }
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1,
+      "description": "One Keycloak with a local cache"
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The Service lists the HTTP port only; the management port (health, /metrics) is never exposed by it.",
+      "required": [
+        "port"
+      ],
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "podAnnotations": {
+      "type": "object",
+      "description": "The prometheus.io/* annotations are set by the chart (management port 9000, /metrics).",
+      "propertyNames": {
+        "not": {
+          "pattern": "^prometheus\\.io/"
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "existingSecret": {
+      "type": "string",
+      "minLength": 1
+    },
+    "env": {
+      "type": "object",
+      "description": "Non-secret settings only; secrets belong in the Secret named by existingSecret.",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$",
+        "not": {
+          "enum": [
+            "KC_DB_USERNAME",
+            "KC_DB_PASSWORD",
+            "KC_BOOTSTRAP_ADMIN_USERNAME",
+            "KC_BOOTSTRAP_ADMIN_PASSWORD",
+            "TENANTS_CLIENT_SECRET",
+            "PAYMENTS_CLIENT_SECRET",
+            "MARKET_MAKER_CLIENT_SECRET",
+            "MARKETS_CLIENT_SECRET",
+            "TENANTS_MARKETS_CLIENT_SECRET",
+            "PLATFORM_ADMIN_PASSWORD",
+            "SMTP_USER",
+            "SMTP_PASSWORD",
+            "GOOGLE_CLIENT_SECRET"
+          ]
+        }
+      },
+      "properties": {
+        "SMTP_PORT": {
+          "type": "string",
+          "pattern": "^[0-9]{1,5}$"
+        },
+        "SMTP_SSL": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "SMTP_STARTTLS": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "SMTP_AUTH": {
+          "type": "string",
+          "enum": ["true", "false"]
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      },
+      "required": [
+        "KC_DB_URL",
+        "KC_HOSTNAME",
+        "CHANCE_WEB_URL",
+        "PLATFORM_ADMIN_USERNAME",
+        "PLATFORM_ADMIN_EMAIL",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_FROM",
+        "SMTP_SSL",
+        "SMTP_STARTTLS",
+        "SMTP_AUTH",
+        "GOOGLE_CLIENT_ID"
+      ]
+    },
+    "resources": {
+      "type": "object"
+    },
+    "probes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "startup",
+        "readiness",
+        "liveness"
+      ],
+      "properties": {
+        "startup": {
+          "$ref": "#/definitions/probe"
+        },
+        "readiness": {
+          "$ref": "#/definitions/probe"
+        },
+        "liveness": {
+          "$ref": "#/definitions/probe"
+        }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "gatewayNamespaceLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "gatewayPodLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tokenCheckPodLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "description": "The namespace of Prometheus, admitted on the management port only.",
+          "additionalProperties": false,
+          "required": [
+            "namespace"
+          ],
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$"
+            }
+          }
+        }
+      }
+    },
+    "smokeTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image"
+      ],
+      "properties": {
+        "image": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "definitions": {
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "periodSeconds",
+        "failureThreshold"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "periodSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "failureThreshold": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

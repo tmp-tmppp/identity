@@ -1,0 +1,32 @@
+# Prod overrides. The pipeline sets the image tag; secrets come from the Secret identity-env (IDENTITY_ENV).
+replicaCount: 1
+
+env:
+  # Filled by the deploy pipeline from the organization variable PUBLIC_HOST (the repo's ci-cd.yml host-values); leave
+  # both empty here. KC_HOSTNAME is the issuer of every token and must equal AUTH_ISSUER of the services (without
+  # /realms/chance); CHANCE_WEB_URL is where the web app runs (https://<public host>). Without the host Keycloak refuses
+  # to start ("missing settings: KC_HOSTNAME CHANCE_WEB_URL", exit 64) instead of issuing tokens and redirects for
+  # localhost.
+  KC_HOSTNAME: ""
+  CHANCE_WEB_URL: ""
+  KC_LOG_CONSOLE_OUTPUT: json
+  # Set both when the mail relay is chosen (the verification mails of sign-up); until then Keycloak refuses to start.
+  # SMTP_PORT, SMTP_SSL, SMTP_STARTTLS and SMTP_AUTH come from values.yaml (587, STARTTLS, a login) unless the relay
+  # needs others; its login goes into the Secret identity-env as SMTP_USER and SMTP_PASSWORD.
+  SMTP_HOST: ""
+  SMTP_FROM: ""
+  # The first platform admin's real address is never written here (this file is tracked). It goes into the organization
+  # secret IDENTITY_ENV as the line PLATFORM_ADMIN_EMAIL=<address> (imported as verified, never mailed to check it); the
+  # Secret identity-env is listed after this ConfigMap in the Deployment's envFrom, so its value wins. The key stays
+  # "" because the chart's schema requires it; without the line in the Secret Keycloak refuses to start.
+  PLATFORM_ADMIN_EMAIL: ""
+  # Set to the client id of the Google OAuth client before the deploy (identity/README.md, "Google login"); its secret
+  # goes into the Secret identity-env as GOOGLE_CLIENT_SECRET. Until then Keycloak refuses to start.
+  GOOGLE_CLIENT_ID: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 768Mi
+  limits:
+    memory: 1Gi

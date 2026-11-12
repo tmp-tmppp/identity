@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "identity.fullname" . }}
+  labels:
+    {{- include "identity.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "identity.selectorLabels" . | nindent 4 }}
+  ports:
+    # The realm and its OpenID Connect endpoints (the gateway publishes this port).
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+    # Only the HTTP port. The management port (health and /metrics, 9000) is not listed: the kubelet probes it on the
+    # Pod and Prometheus scrapes the Pod address (annotations in deployment.yaml), so no name of the Service reaches it.

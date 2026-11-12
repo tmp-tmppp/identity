@@ -1,0 +1,8 @@
+# Dev overrides (a local cluster): readable logs and more detail.
+env:
+  KC_LOG_CONSOLE_OUTPUT: default
+  KC_LOG_LEVEL: info,org.keycloak.events:debug
+  # SMTP_HOST and SMTP_FROM come empty from values.yaml, so Keycloak refuses to start until they name a mail server
+  # in the cluster: a relay, or a mail catcher with SMTP_STARTTLS "false" and SMTP_AUTH "false" as in compose.yaml.
+  # GOOGLE_CLIENT_ID comes empty from values.yaml too: a Google OAuth client's id, or a placeholder as in compose.yaml
+  # (then the Google button fails and the local accounts work), with GOOGLE_CLIENT_SECRET in the Secret.

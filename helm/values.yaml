@@ -1,0 +1,102 @@
+# Defaults, safe for a local cluster. values-dev.yaml and values-prod.yaml override them; the pipeline sets
+# image.repository, image.tag (sha-<commit>) and image.digest with --set-string and never puts secrets into
+# values.
+
+image:
+  repository: docker.io/example/identity
+  tag: latest
+  # sha256:<64 hex>; when set, the image is pulled by digest (the tag stays for people).
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# One replica with a local cache (ADR-033); the Deployment replaces it with the Recreate strategy.
+replicaCount: 1
+
+# The Service lists the HTTP port only. Health and /metrics are on the management port 9000 of the Pod (fixed in the
+# image), which no Service and no gateway route reaches; the Pod annotations prometheus.io/* (REQ-20) tell Prometheus
+# to scrape the Pod address.
+service:
+  port: 8080
+
+# Further Pod annotations; the prometheus.io ones are set by the chart and refused here.
+podAnnotations: {}
+
+# Secret settings come from this Secret (the pipeline creates it from the organization secret IDENTITY_ENV):
+# KC_DB_USERNAME, KC_DB_PASSWORD, KC_BOOTSTRAP_ADMIN_USERNAME, KC_BOOTSTRAP_ADMIN_PASSWORD, TENANTS_CLIENT_SECRET,
+# PAYMENTS_CLIENT_SECRET, MARKET_MAKER_CLIENT_SECRET, MARKETS_CLIENT_SECRET, TENANTS_MARKETS_CLIENT_SECRET,
+# PLATFORM_ADMIN_PASSWORD, PLATFORM_ADMIN_EMAIL (the first platform admin's real address, kept out of the tracked
+# files), SMTP_USER and SMTP_PASSWORD (the login at the mail relay that sends the verification mails) and
+# GOOGLE_CLIENT_SECRET (the secret of the Google OAuth client of the login with Google). Keycloak does not start while
+# one of them is missing. The Deployment lists this Secret after the ConfigMap in envFrom, so its values win.
+existingSecret: identity-env
+
+# Non-secret settings, rendered into a ConfigMap (all values are strings).
+env:
+  # The identity provider's own database on the shared PostgreSQL server (DM-01).
+  KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+  # The public address of Keycloak as the browser sees it; it is also the issuer of every token.
+  KC_HOSTNAME: http://localhost:8081
+  CHANCE_WEB_URL: http://localhost:5173
+  PLATFORM_ADMIN_USERNAME: platform-admin
+  # The first platform admin's e-mail address, imported as already verified. The real address is not kept in a values
+  # file (the file is tracked): it goes into the organization secret IDENTITY_ENV as PLATFORM_ADMIN_EMAIL=<address>
+  # and wins over this value (the Secret comes after the ConfigMap in envFrom). The key stays "" because the schema
+  # requires it, and Keycloak refuses to start while the Secret does not hold the address.
+  PLATFORM_ADMIN_EMAIL: ""
+  KC_LOG_CONSOLE_OUTPUT: json
+  KC_LOG_LEVEL: info
+  # Heap as a share of the container's memory limit.
+  JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=70
+  # The mail relay that sends the verification mails (verifyEmail; the login is in the Secret above). The relay is
+  # chosen at deploy: SMTP_HOST and SMTP_FROM stay empty until then, and Keycloak refuses to start while they are.
+  SMTP_HOST: ""
+  # 587 with STARTTLS (the default here) or 465 with SMTP_SSL "true"; a login needs one of the two.
+  SMTP_PORT: "587"
+  # The sender address of the mails, on a domain the relay may send for.
+  SMTP_FROM: ""
+  SMTP_SSL: "false"
+  SMTP_STARTTLS: "true"
+  SMTP_AUTH: "true"
+  # The client id of the Google OAuth client (type Web application) of the login with Google; not a secret, so here
+  # (its secret is GOOGLE_CLIENT_SECRET in the Secret above). The client is created at deploy (identity/README.md,
+  # "Google login"): it stays empty until then, and Keycloak refuses to start while it is.
+  GOOGLE_CLIENT_ID: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 768Mi
+  limits:
+    memory: 1Gi
+
+probes:
+  startup:
+    path: /health/started
+    periodSeconds: 5
+    failureThreshold: 60
+  readiness:
+    path: /health/ready
+    periodSeconds: 10
+    failureThreshold: 3
+  liveness:
+    path: /health/live
+    periodSeconds: 15
+    failureThreshold: 4
+
+# Admits the gateway and the services of this namespace. Needs a network policy engine in the cluster.
+networkPolicy:
+  enabled: false
+  gatewayNamespaceLabels:
+    kubernetes.io/metadata.name: gateway
+  gatewayPodLabels:
+    app.kubernetes.io/name: traefik
+  # the gateway's token check (oauth2-proxy, gateway/helm) reads the realm's signing keys
+  tokenCheckPodLabels:
+    app.kubernetes.io/name: oauth2-proxy
+  # The namespace of Prometheus (selected by its kubernetes.io/metadata.name label): admitted on the management port
+  # only, for /metrics.
+  metrics:
+    namespace: monitoring
+
+smokeTest:
+  image: docker.io/library/busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
