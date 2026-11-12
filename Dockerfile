@@ -3,7 +3,7 @@
 # by tag and digest; Dependabot proposes updates.
 
 # --- build stage: fix the build-time options ----------------------------------------------------------------
-FROM quay.io/keycloak/keycloak:26.8.2@sha256:3879c623248408de29a5303178b5816c77e8dfef3890c361f8c0bbeaa979ba3b AS build
+FROM quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0 AS build
 ENV KC_DB=postgres \
     KC_HEALTH_ENABLED=true \
     KC_METRICS_ENABLED=true \
@@ -13,7 +13,7 @@ ENV KC_DB=postgres \
 RUN /opt/keycloak/bin/kc.sh build
 
 # --- runtime stage ------------------------------------------------------------------------------------------
-FROM quay.io/keycloak/keycloak:26.8.2@sha256:3879c623248408de29a5303178b5816c77e8dfef3890c361f8c0bbeaa979ba3b
+FROM quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
 COPY --from=build /opt/keycloak/ /opt/keycloak/
 COPY --chown=1000:0 realm/chance-realm.json /opt/keycloak/data/import/chance-realm.json
 COPY --chown=1000:0 --chmod=0555 docker-entrypoint.sh /opt/keycloak/bin/docker-entrypoint.sh
